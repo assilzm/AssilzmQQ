@@ -1,0 +1,53 @@
+apply plugin: 'groovy'
+apply plugin: 'idea'
+apply plugin: 'maven'
+
+
+group = 'com.assilzm'
+archivesBaseName = 'smartqq'
+version = '0.1-SNAPSHOT'
+
+project.ext.set("mavenUrl", "http://192.168.10.30:8081/nexus")
+
+
+javadoc {
+    options.encoding = "UTF-8"
+}
+
+
+repositories {
+    mavenLocal()
+    maven {
+        url project.mavenUrl + "/content/groups/public/"
+    }
+}
+
+sourceSets {
+    main {
+        groovy.srcDirs = ['src/main/groovy']
+        java.srcDirs = []
+        resources.srcDirs = []
+    }
+
+    test {
+        groovy.srcDirs = ['src/test/groovy']
+        java.srcDirs = []
+        resources.srcDirs = []
+    }
+
+    resources {
+        groovy.srcDirs = []
+        java.srcDirs = []
+        resources.srcDirs = ['src/main/resources', 'src/test/resources']
+    }
+
+}
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy-all:2.4.4'
+//    compile 'org.mock-server:mockserver-client-java:3.10.1'
+//    compile 'com.nanohttpd:nanohttpd:2.1.1'
+    compile 'com.ning:async-http-client:1.9.31'
+    compile 'log4j:log4j:1.2.17'
+
+}
