@@ -2,9 +2,9 @@ package http
 
 import com.ning.http.client.AsyncHttpClient
 import com.ning.http.client.Param
+import com.ning.http.client.Request
 import com.ning.http.client.Response
 import com.ning.http.client.cookie.Cookie
-import com.ning.http.client.cookie.CookieDecoder
 import com.ning.http.client.resumable.ResumableAsyncHandler
 import com.ning.http.client.resumable.ResumableListener
 
@@ -18,11 +18,11 @@ import java.nio.ByteBuffer
  */
 class HttpClient {
 
-    final static String USER_AGENET = "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0"
+    final static String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36"
 
     List<Cookie> cookies = new ArrayList<>()
 
-    String referrer = null
+    String referer = null
 
     Map<String, String> headerToAdd = [:]
 
@@ -31,7 +31,6 @@ class HttpClient {
 
     HttpClient() {
         client = new AsyncHttpClient()
-
     }
 
     String getAndReturnBody(String url) {
@@ -40,75 +39,80 @@ class HttpClient {
 
 
     Response get(String url) {
-        println url
-        getResponse(client.prepareGet(url))
+        getResponse("GET", url)
     }
 
     String postAndReturnBody(String url, Map<String, String> params) {
-        post(url,params).responseBody
+        post(url, params).responseBody
     }
 
 
     Response post(String url, Map<String, String> params) {
-        getResponse(client.preparePost(url), mapToParamList(params))
+        post(url, mapToParamList(params))
     }
 
     Response post(String url, List<Param> params) {
-        getResponse(client.preparePost(url), params)
+        getResponse("POST", url, params)
     }
 
-    Response getResponse(AsyncHttpClient.BoundRequestBuilder request, List<Param> params = null) {
-        println this.cookies
-        params.each {
-            println "${it.getName()}=${it.getValue()}"
-
+    Response getResponse(String type, String urlString, List<Param> params = null, isSyncDomainCookies = true) {
+        URL url = new URL(urlString)
+        println url
+        if (isSyncDomainCookies)
+            cookies.removeAll {
+                println it
+                !url.host.endsWith(it.domain)
+            }
+        println cookies
+        Request request
+        switch (type) {
+            case "GET":
+                request = client.prepareGet(urlString)
+                break
+            case "POST":
+                request = client.preparePost(urlString)
+                break
+            default:
+                throw new Exception("unknodw method")
         }
-         request= addHeader(request.addHeader("USER-AGENET", USER_AGENET).addHeader("Referrer", referrer).addHeader("Accept", "*/*").addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8").addHeader("Cache-Control", "no-cache").addQueryParams(params))
+        request = addHeader(request.addHeader("User-Agent", USER_AGENT).addHeader("Referer", referer).addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8").addHeader("Accept-Language","zh-cn,zh;q=0.8").addHeader("Connection","keep-alive").addHeader("Accept","*/*").addQueryParams(params))
         cookies.each {
-            request=request.addOrReplaceCookie(it)
+            request = request.addOrReplaceCookie(it)
         }
-        def response=request.execute().get()
+        def response = request.execute().get()
         println response.headers
         println response.cookies
-        syncCookies(response.headers.get("Set-Cookie"))
+        syncCookies(response.getCookies())
+        println "after sync:${cookies.join("\r\n")}"
         response
     }
+
 
     AsyncHttpClient.BoundRequestBuilder addHeader(AsyncHttpClient.BoundRequestBuilder requestBuilder) {
         headerToAdd.each { key, value ->
             requestBuilder.addHeader(key, value)
         }
-
         headerToAdd.clear()
         return requestBuilder
     }
 
-    void syncCookies(List<String> cookieToSet) {
-        cookieToSet.each { cookieString ->
-            if (cookieString) {
-                cookieString.split(";,").each {
-                    Cookie cookie = CookieDecoder.decode(it)
-                    Cookie cookieToAdd=new Cookie(cookie.name,cookie.value,false,null,null,-1,false,false)
-                    if (!(cookieToAdd in cookies)&&cookieToAdd.value.trim())
-                        cookies.add(cookieToAdd)
-                }
-            }
+    void syncCookies(List<Cookie> cookieToSet) {
+        cookieToSet.each {
+            if (!it.value.trim().empty)
+                setCookie(it)
         }
+
     }
 
     void setCookie(Cookie cookie) {
-        boolean hasCookie = false
-        for (existCookie in cookies) {
-            if (existCookie.name == cookie.name) {
-                if (!cookie.value.trim().empty) {
-                    cookies.remove(existCookie)
-                    cookies.add(cookie)
-                }
-                hasCookie = true
-                break
+        boolean hasSync = false
+        for (int i in 0..<cookies.size()) {
+            if (cookie.name.equals(cookies[i].name) && cookie.domain.equals(cookies[i].domain)) {
+                cookies[i] = cookie
+                hasSync = true
             }
         }
-        if (!hasCookie)
+        if (!hasSync)
             cookies.add(cookie)
     }
 
@@ -133,11 +137,17 @@ class HttpClient {
                 return file.length()
             }
         })
-        def response = client.prepareGet(url).addHeader("USER-AGENET", USER_AGENET).addHeader("Referrer", referrer).addHeader("Accept", "*/*").setCookies(cookies).execute(a).get()
-        syncCookies(response.headers.get("Set-Cookie"))
+        def request = client.prepareGet(url).addHeader("User-Agent", USER_AGENT).addHeader("Accept", "*/*")
+
+        cookies.each {
+            request = request.addOrReplaceCookie(it)
+        }
+        Response response = request.execute(a).get()
+        syncCookies(response.getCookies())
+
     }
 
-    void clearCookies(){
+    void clearCookies() {
         cookies.clear()
     }
 
@@ -159,7 +169,7 @@ class HttpClient {
     static List<Param> mapToParamList(Map<String, String> param) {
         List<Param> paramList = new ArrayList<>()
         param.each { key, value ->
-            paramList.add(new Param(key, URLEncoder.encode(value,"UTF-8")))
+            paramList.add(new Param(key, value))
         }
         return paramList
     }

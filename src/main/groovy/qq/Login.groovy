@@ -1,5 +1,4 @@
 package qq
-
 import com.ning.http.client.Response
 import http.HttpClient
 import utils.ImageLoader
@@ -32,8 +31,8 @@ class Login {
         String mibao_css = RegexUtils.getRegexValue(initPageContent, /var g_mibao_css=encodeURIComponent\("(.+?)"\);/)
         File file = new File(qrcode_path)
         Long startTime = System.currentTimeMillis()
-//        httpClient.cookies.clear()
-        httpClient.referrer = "https://ui.ptlogin2.qq.com/cgi-bin/login?daid=164&target=self&style=16&mibao_css=m_webqq&appid=501004106&enable_qlogin=0&no_verifyimg=1&s_url=http%3A%2F%2Fw.qq.com%2Fproxy.html&f_url=loginerroralert&strong_login=1&login_state=10&t=20131024001"
+
+        httpClient.referer = "https://ui.ptlogin2.qq.com/cgi-bin/login?daid=164&target=self&style=16&mibao_css=m_webqq&appid=501004106&enable_qlogin=0&no_verifyimg=1&s_url=http%3A%2F%2Fw.qq.com%2Fproxy.html&f_url=loginerroralert&strong_login=1&login_state=10&t=20131024001"
 
         httpClient.getFile("https://ssl.ptlogin2.qq.com/ptqrshow?appid=${appid}&e=0&l=M&s=8&d=72&v=4&t=0.1196356974542141", file)
 
@@ -73,17 +72,21 @@ class Login {
 //        println html
 //        url=RegexUtils.getRegexValue(html,/location\.href="(.+?)"/)
 //        println url
-        html=httpClient.getAndReturnBody("http://w.qq.com/proxy.html?login2qq=1&webqq_type=10")
+        html=httpClient.getResponse("GET","http://w.qq.com/proxy.html?login2qq=1&webqq_type=10",null,false).responseBody
         println html
         ptwebqq=httpClient.getCookie("ptwebqq")
         println ptwebqq
 
-        httpClient.referrer="http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2"
+        httpClient.referer="http://d.web2.qq.com/proxy.html?v=20130916001&callback=1&id=2"
 
+//        for (Cookie cookie in httpClient.cookies) {
+//            println cookie
+//            if (cookie.domain!="web2.qq.com")
+//                httpClient.cookies.remove(cookie)
+//        }
 
         while(1){
             Map map=["r":"{\"ptwebqq\":\"${ptwebqq}\",\"clientid\":${client_id},\"psessionid\":\"${psessionid}\",\"status\":\"online\"}"]
-            println map
             html=httpClient.postAndReturnBody("http://d.web2.qq.com/channel/login2",map)
             println html
             sleep(1000)
